@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/pgombola/knowmads/client"
+	"github.com/pgombola/gomad/client"
 )
 
 func main() {
