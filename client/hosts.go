@@ -9,13 +9,13 @@ import (
 	"time"
 )
 
-type Node struct {
+type host struct {
 	ID    string `json:"ID"`
 	Name  string `json:"Name"`
 	Drain bool   `json:"Drain"`
 }
 
-var nodes []Node
+var hosts []host
 
 func PopulateHosts(host string) {
 	url := host + "/v1/nodes"
@@ -34,7 +34,7 @@ func PopulateHosts(host string) {
 }
 
 func PrintHosts() {
-	for _, node := range nodes {
+	for _, node := range hosts {
 		fmt.Printf("ID=%v;Name=%v;Drain=%v\n", node.ID, node.Name, node.Drain)
 	}
 }
@@ -42,7 +42,7 @@ func PrintHosts() {
 func decodeNodes(body io.ReadCloser) {
 	decoder := json.NewDecoder(body)
 
-	if err := decoder.Decode(&nodes); err != nil {
+	if err := decoder.Decode(&hosts); err != nil {
 		log.Fatal(err)
 	}
 }

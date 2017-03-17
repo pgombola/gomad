@@ -9,26 +9,26 @@ import (
 	"time"
 )
 
-type Details struct {
+type details struct {
 	Running int `json:"running"`
 }
 
-type Summary struct {
-	Details Details `json:"server"`
+type summary struct {
+	Details details `json:"server"`
 }
 
-type JobSummary struct {
-	Summary Summary `json:"Summary"`
+type jobSummary struct {
+	Summary summary `json:"Summary"`
 }
 
-type Job struct {
+type job struct {
 	Name       string     `json:"Name"`
 	Priority   int        `json:"Priority"`
 	Status     string     `json:"status"`
-	JobSummary JobSummary `json:"JobSummary"`
+	JobSummary jobSummary `json:"JobSummary"`
 }
 
-var jobs []Job
+var jobs []job
 
 func PopulateJobs(host string) {
 	url := host + "/v1/jobs"
