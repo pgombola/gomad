@@ -27,10 +27,10 @@ func Status(host string) []Node {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
-	return decode(resp.Body)
+	return decodeNodes(resp.Body)
 }
 
-func decode(body io.ReadCloser) []Node {
+func decodeNodes(body io.ReadCloser) []Node {
 	decoder := json.NewDecoder(body)
 
 	var nodes []Node
