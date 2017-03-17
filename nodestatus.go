@@ -29,10 +29,8 @@ func main() {
 	}
 
 	if hosts {
-		nodes := client.Status("http://" + nomad)
-		for _, node := range nodes {
-			fmt.Printf("ID=%v;Name=%v;Drain=%v\n", node.ID, node.Name, node.Drain)
-		}
+		client.PopulateHosts("http://" + nomad)
+		client.PrintHosts()
 	}
 
 	if jobs {

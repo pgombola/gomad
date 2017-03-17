@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -14,7 +15,9 @@ type Node struct {
 	Drain bool   `json:"Drain"`
 }
 
-func Status(host string) []Node {
+var nodes []Node
+
+func PopulateHosts(host string) {
 	url := host + "/v1/nodes"
 
 	timeout := time.Duration(5 * time.Second)
@@ -27,15 +30,19 @@ func Status(host string) []Node {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
-	return decodeNodes(resp.Body)
+	decodeNodes(resp.Body)
 }
 
-func decodeNodes(body io.ReadCloser) []Node {
+func PrintHosts() {
+	for _, node := range nodes {
+		fmt.Printf("ID=%v;Name=%v;Drain=%v\n", node.ID, node.Name, node.Drain)
+	}
+}
+
+func decodeNodes(body io.ReadCloser) {
 	decoder := json.NewDecoder(body)
 
-	var nodes []Node
 	if err := decoder.Decode(&nodes); err != nil {
 		log.Fatal(err)
 	}
-	return nodes
 }
