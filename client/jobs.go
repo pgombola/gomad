@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -27,7 +28,9 @@ type Job struct {
 	JobSummary JobSummary `json:"JobSummary"`
 }
 
-func Jobs(host string) []Job {
+var jobs []Job
+
+func PopulateJobs(host string) {
 	url := host + "/v1/jobs"
 
 	timeout := time.Duration(5 * time.Second)
@@ -40,15 +43,19 @@ func Jobs(host string) []Job {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
-	return decodeJobs(resp.Body)
+	decodeJobs(resp.Body)
 }
 
-func decodeJobs(body io.ReadCloser) []Job {
+func PrintJobs() {
+	for _, job := range jobs {
+		fmt.Printf("Name=%v;Priority=%v;Status=%v;Running=%v\n", job.Name, job.Priority, job.Status, job.JobSummary.Summary.Details.Running)
+	}
+}
+
+func decodeJobs(body io.ReadCloser) {
 	decoder := json.NewDecoder(body)
 
-	var jobs []Job
 	if err := decoder.Decode(&jobs); err != nil {
 		log.Fatal(err)
 	}
-	return jobs
 }

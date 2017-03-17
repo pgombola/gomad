@@ -36,9 +36,7 @@ func main() {
 	}
 
 	if jobs {
-		jobs := client.Jobs("http://" + nomad)
-		for _, job := range jobs {
-			fmt.Printf("Name=%v;Priority=%v;Status=%v;Running=%v\n", job.Name, job.Priority, job.Status, job.JobSummary.Summary.Details.Running)
-		}
+		client.PopulateJobs("http://" + nomad)
+		client.PrintJobs()
 	}
 }
