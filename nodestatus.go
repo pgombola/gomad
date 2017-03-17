@@ -24,13 +24,13 @@ func main() {
 	flag.Parse()
 
 	if nomad == "" {
-		fmt.Println("nomad flag must be set.")
+		fmt.Print("nomad flag must be set.")
 		os.Exit(-1)
 	}
 
 	if hosts {
 		client.PopulateHosts("http://" + nomad)
-		client.PrintHosts()
+		fmt.Println(client.HostsToString())
 	}
 
 	if jobs {

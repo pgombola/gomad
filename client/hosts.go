@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,10 +34,21 @@ func PopulateHosts(host string) {
 	decodeNodes(resp.Body)
 }
 
-func PrintHosts() {
-	for _, node := range hosts {
-		fmt.Printf("ID=%v;Name=%v;Drain=%v\n", node.ID, node.Name, node.Drain)
+func HostsToString() string {
+	var buffer bytes.Buffer
+	for _, host := range hosts {
+		fmt.Fprintf(&buffer, "ID=%v;Name=%v;Drain=%v\n", host.ID, host.Name, host.Drain)
 	}
+	return buffer.String()
+}
+
+func IsDraining(h string) bool {
+	for _, host := range hosts {
+		if host.Name == h {
+			return host.Drain
+		}
+	}
+	return false
 }
 
 func decodeNodes(body io.ReadCloser) {
