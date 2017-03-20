@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"time"
+	"strconv"
 )
 
 type Host struct {
@@ -30,6 +31,14 @@ func PopulateHosts(host string) []Host {
 	}
 	defer resp.Body.Close()
 	return decodeNodes(resp.Body)
+}
+
+func Drain(host string, id string, enabled bool) {
+    url := host + "/v1/node/" + id + "/drain?enable=" + strconv.FormatBool(enabled)
+        
+    client := &http.Client{}
+    resp, _ := client.Post(url, "application/json", nil)
+    fmt.Println(resp.Status)
 }
 
 func HostsToString(hosts []Host) string {
