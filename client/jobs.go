@@ -9,28 +9,26 @@ import (
 	"time"
 )
 
-type details struct {
+type Details struct {
 	Running int `json:"running"`
 }
 
-type summary struct {
-	Details details `json:"server"`
+type Summary struct {
+	Details Details `json:"server"`
 }
 
-type jobSummary struct {
-	Summary summary `json:"Summary"`
+type JobSummary struct {
+	Summary Summary `json:"Summary"`
 }
 
-type job struct {
+type Job struct {
 	Name       string     `json:"Name"`
 	Priority   int        `json:"Priority"`
 	Status     string     `json:"status"`
-	JobSummary jobSummary `json:"JobSummary"`
+	JobSummary JobSummary `json:"JobSummary"`
 }
 
-var jobs []job
-
-func PopulateJobs(host string) {
+func PopulateJobs(host string) []Job {
 	url := host + "/v1/jobs"
 
 	timeout := time.Duration(5 * time.Second)
@@ -43,19 +41,21 @@ func PopulateJobs(host string) {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
-	decodeJobs(resp.Body)
+	return decodeJobs(resp.Body)
 }
 
-func PrintJobs() {
+func PrintJobs(jobs []Job) {
 	for _, job := range jobs {
 		fmt.Printf("Name=%v;Priority=%v;Status=%v;Running=%v\n", job.Name, job.Priority, job.Status, job.JobSummary.Summary.Details.Running)
 	}
 }
 
-func decodeJobs(body io.ReadCloser) {
+func decodeJobs(body io.ReadCloser) []Job {
 	decoder := json.NewDecoder(body)
 
+	var jobs []Job
 	if err := decoder.Decode(&jobs); err != nil {
 		log.Fatal(err)
 	}
+	return jobs
 }

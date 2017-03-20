@@ -10,15 +10,13 @@ import (
 	"time"
 )
 
-type host struct {
+type Host struct {
 	ID    string `json:"ID"`
 	Name  string `json:"Name"`
 	Drain bool   `json:"Drain"`
 }
 
-var hosts []host
-
-func PopulateHosts(host string) {
+func PopulateHosts(host string) []Host {
 	url := host + "/v1/nodes"
 
 	timeout := time.Duration(5 * time.Second)
@@ -31,10 +29,10 @@ func PopulateHosts(host string) {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
-	decodeNodes(resp.Body)
+	return decodeNodes(resp.Body)
 }
 
-func HostsToString() string {
+func HostsToString(hosts []Host) string {
 	var buffer bytes.Buffer
 	for _, host := range hosts {
 		fmt.Fprintf(&buffer, "ID=%v;Name=%v;Drain=%v\n", host.ID, host.Name, host.Drain)
@@ -42,19 +40,11 @@ func HostsToString() string {
 	return buffer.String()
 }
 
-func IsDraining(h string) bool {
-	for _, host := range hosts {
-		if host.Name == h {
-			return host.Drain
-		}
-	}
-	return false
-}
-
-func decodeNodes(body io.ReadCloser) {
+func decodeNodes(body io.ReadCloser) []Host {
 	decoder := json.NewDecoder(body)
-
+	var hosts []Host
 	if err := decoder.Decode(&hosts); err != nil {
 		log.Fatal(err)
 	}
+	return hosts
 }
