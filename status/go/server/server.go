@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/pgombola/gomad/client"
-	pb "github.com/pgombola/gomad/status"
+	pb "github.com/pgombola/gomad/status/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
 )
