@@ -61,8 +61,7 @@ func Hosts(nomad *NomadServer) []Host {
 }
 
 func Drain(nomad *NomadServer, id string, enable bool) string {
-        client := &http.Client{}
-        resp, _ := client.Post(url(nomad) + "/v1/node/" + id + "/drain?enable=" + strconv.FormatBool(enable), "application/json", nil)
+        resp, _ := httpClient.Post(url(nomad) + "/v1/node/" + id + "/drain?enable=" + strconv.FormatBool(enable), "application/json", nil)
         return resp.Status
 }
 
