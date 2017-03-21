@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"strconv"
 )
 
 // NomadServer is connection parameters to a nomad server
@@ -57,6 +58,11 @@ func Hosts(nomad *NomadServer) []Host {
 	hosts := make([]Host, 0)
 	decodeJSON(url(nomad)+"/v1/nodes", &hosts)
 	return hosts
+}
+
+func Drain(nomad *NomadServer, id string, enable bool) string {
+        resp, _ := httpClient.Post(url(nomad) + "/v1/node/" + id + "/drain?enable=" + strconv.FormatBool(enable), "application/json", nil)
+        return resp.Status
 }
 
 func url(nomad *NomadServer) string {
