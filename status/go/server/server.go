@@ -26,36 +26,36 @@ type clusterStatusServer struct {
 }
 
 func (s *clusterStatusServer) ListHosts(req *pb.HostsRequest, stream pb.ClusterStatus_ListHostsServer) error {
-	hosts := client.PopulateHosts("http://10.10.20.31:4646")
-	clarifyJob := findClarifyJob(client.PopulateJobs("http://10.10.20.31:4646"))
+	nomad := &client.NomadServer{Address: "10.10.20.31", Port: 4646}
+	hosts := client.Hosts(nomad)
+	clarifyJob, _ := client.FindJob(nomad, "clarify")
 
 	for _, host := range hosts {
-		stream.Send(&pb.HostReply{Hostname: host.Name, Status: status(clarifyJob)})
+		alloc, err := client.FindAlloc(nomad, clarifyJob, &host)
+		if err != nil {
+			// TODO clarify not allocated here
+		}
+		stream.Send(&pb.HostReply{Hostname: host.Name, Status: status(&host, clarifyJob, alloc)})
 	}
 	return nil
 }
 
-func findClarifyJob(jobs []client.Job) *client.Job {
-	for _, job := range jobs {
-		if job.Name == "clarify" {
-			return &job
-		}
+func status(host *client.Host, clarify *client.Job, alloc *client.Alloc) pb.HostReply_HostStatus {
+	var status pb.HostReply_HostStatus
+	fmt.Printf("Host: %v\n", host)
+	fmt.Printf("Job: %v\n", clarify)
+	fmt.Printf("Alloc: %v\n", alloc)
+	if clarify.Name == "" {
+		status = pb.HostReply_STOPPED
+	} else if alloc.ClientStatus == "lost" && host.Drain {
+		status = pb.HostReply_PENDING
+	} else if alloc.ClientStatus == "running" && !alloc.CheckTaskStates("running") {
+		status = pb.HostReply_MIXED
+	} else {
+		status = pb.HostReply_STARTED
 	}
-	return &client.Job{Status: "stopped"}
-}
-
-func status(job *client.Job) pb.HostReply_HostStatus {
-	switch job.Status {
-	case "running":
-		return pb.HostReply_STARTED
-	case "stopped":
-		return pb.HostReply_STOPPED
-	}
-	return pb.HostReply_MIXED
-}
-
-func clarifyStarted(job client.Job) bool {
-	return job.Status == "running"
+	fmt.Printf("Returning status: %v\n", status)
+	return status
 }
 
 func newServer() *clusterStatusServer {

@@ -24,14 +24,14 @@ func printHosts(client pb.ClusterStatusClient) {
 		grpclog.Fatalf("%v.ListHosts(_) = _, %v", client, err)
 	}
 	for {
-		host, err := stream.Recv()
+		hostReply, err := stream.Recv()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
 			grpclog.Fatalf("%v.ListHosts(_) = _, %v", client, err)
 		}
-		grpclog.Println(host)
+		grpclog.Printf("Hostname: %v;Status: %v", hostReply.GetHostname(), hostReply.GetStatus())
 	}
 }
 
