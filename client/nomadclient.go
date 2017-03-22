@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"io/ioutil"
+	"bytes"
 )
 
 // NomadServer is connection parameters to a nomad server
@@ -104,10 +106,19 @@ func Hosts(nomad *NomadServer) []Host {
 	return hosts
 }
 
-// Drain will inform nomad to remove all allocations from that host
+// Drain will inform nomad to add/remove all allocations from that host
+// depending on the value of enable
 func Drain(nomad *NomadServer, id string, enable bool) string {
 	resp, _ := httpClient.Post(url(nomad)+"/v1/node/"+id+"/drain?enable="+strconv.FormatBool(enable), "application/json", nil)
+	defer resp.Body.Close()
 	return resp.Status
+}
+
+func SubmitJob(nomad *NomadServer, launchFilePath string) (string, error) {
+    file, err := ioutil.ReadFile(launchFilePath)
+    resp, _ := httpClient.Post(url(nomad)+"/v1/jobs", "application/json", bytes.NewBuffer(file))
+    defer resp.Body.Close()
+    return resp.Status, err
 }
 
 // Allocs will parse the json representation from the nomad rest api
