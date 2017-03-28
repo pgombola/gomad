@@ -11,6 +11,9 @@ import (
 	"bytes"
 )
 
+const http_bad_payload string = "400"
+const http_unknown_error string = "520"
+
 // NomadServer is connection parameters to a nomad server
 type NomadServer struct {
 	Address string
@@ -108,17 +111,26 @@ func Hosts(nomad *NomadServer) []Host {
 
 // Drain will inform nomad to add/remove all allocations from that host
 // depending on the value of enable
-func Drain(nomad *NomadServer, id string, enable bool) string {
-	resp, _ := httpClient.Post(url(nomad)+"/v1/node/"+id+"/drain?enable="+strconv.FormatBool(enable), "application/json", nil)
-	defer resp.Body.Close()
-	return resp.Status
+func Drain(nomad *NomadServer, id string, enable bool) (string, error) {
+	resp, err := httpClient.Post(url(nomad)+"/v1/node/"+id+"/drain?enable="+strconv.FormatBool(enable), "application/json", nil)
+	if resp != nil && resp.Body != nil {
+	        defer resp.Body.Close()
+	        return resp.Status, err
+	}
+	return http_unknown_error, err
 }
 
 func SubmitJob(nomad *NomadServer, launchFilePath string) (string, error) {
     file, err := ioutil.ReadFile(launchFilePath)
-    resp, _ := httpClient.Post(url(nomad)+"/v1/jobs", "application/json", bytes.NewBuffer(file))
-    defer resp.Body.Close()
-    return resp.Status, err
+    if err != nil {
+        return http_bad_payload, err
+    }
+    resp, err := httpClient.Post(url(nomad)+"/v1/jobs", "application/json", bytes.NewBuffer(file))
+    if resp != nil && resp.Body != nil {
+            defer resp.Body.Close()
+            return resp.Status, err
+    }
+    return http_unknown_error, err
 }
 
 // Allocs will parse the json representation from the nomad rest api
