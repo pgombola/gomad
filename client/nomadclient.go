@@ -103,10 +103,10 @@ func (e *JobNotFound) Error() string {
 
 // Hosts will parse the json representation from the nomad rest api
 // /v1/nodes
-func Hosts(nomad *NomadServer) []Host {
+func Hosts(nomad *NomadServer) ([]Host, error) {
 	hosts := make([]Host, 0)
-	decodeJSON(url(nomad)+"/v1/nodes", &hosts)
-	return hosts
+	err := decodeJSON(url(nomad)+"/v1/nodes", &hosts)
+	return hosts, err
 }
 
 // Drain will inform nomad to add/remove all allocations from that host
