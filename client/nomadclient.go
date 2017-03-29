@@ -1,14 +1,14 @@
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-	"io/ioutil"
-	"bytes"
 )
 
 const http_bad_payload string = "400"
@@ -114,23 +114,23 @@ func Hosts(nomad *NomadServer) ([]Host, error) {
 func Drain(nomad *NomadServer, id string, enable bool) (string, error) {
 	resp, err := httpClient.Post(url(nomad)+"/v1/node/"+id+"/drain?enable="+strconv.FormatBool(enable), "application/json", nil)
 	if resp != nil && resp.Body != nil {
-	        defer resp.Body.Close()
-	        return resp.Status, err
+		defer resp.Body.Close()
+		return resp.Status, err
 	}
 	return http_unknown_error, err
 }
 
 func SubmitJob(nomad *NomadServer, launchFilePath string) (string, error) {
-    file, err := ioutil.ReadFile(launchFilePath)
-    if err != nil {
-        return http_bad_payload, err
-    }
-    resp, err := httpClient.Post(url(nomad)+"/v1/jobs", "application/json", bytes.NewBuffer(file))
-    if resp != nil && resp.Body != nil {
-            defer resp.Body.Close()
-            return resp.Status, err
-    }
-    return http_unknown_error, err
+	file, err := ioutil.ReadFile(launchFilePath)
+	if err != nil {
+		return http_bad_payload, err
+	}
+	resp, err := httpClient.Post(url(nomad)+"/v1/jobs", "application/json", bytes.NewBuffer(file))
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+		return resp.Status, err
+	}
+	return http_unknown_error, err
 }
 
 // Allocs will parse the json representation from the nomad rest api
