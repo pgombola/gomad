@@ -11,8 +11,9 @@ import (
 	"time"
 )
 
-const http_bad_payload string = "400"
-const http_unknown_error string = "520"
+const http_bad_payload_status string = "400"
+const http_unknown_error_status string = "520"
+const http_ok_status = "200"
 
 // NomadServer is connection parameters to a nomad server
 type NomadServer struct {
@@ -103,10 +104,10 @@ func (e *JobNotFound) Error() string {
 
 // Hosts will parse the json representation from the nomad rest api
 // /v1/nodes
-func Hosts(nomad *NomadServer) ([]Host, error) {
+func Hosts(nomad *NomadServer) ([]Host, string, error) {
 	hosts := make([]Host, 0)
-	err := decodeJSON(url(nomad)+"/v1/nodes", &hosts)
-	return hosts, err
+	status, err := decodeJSON(url(nomad)+"/v1/nodes", &hosts)
+	return hosts, status, err
 }
 
 // Drain will inform nomad to add/remove all allocations from that host
@@ -117,20 +118,20 @@ func Drain(nomad *NomadServer, id string, enable bool) (string, error) {
 		defer resp.Body.Close()
 		return resp.Status, err
 	}
-	return http_unknown_error, err
+	return http_unknown_error_status, err
 }
 
 func SubmitJob(nomad *NomadServer, launchFilePath string) (string, error) {
 	file, err := ioutil.ReadFile(launchFilePath)
 	if err != nil {
-		return http_bad_payload, err
+		return http_bad_payload_status, err
 	}
 	resp, err := httpClient.Post(url(nomad)+"/v1/jobs", "application/json", bytes.NewBuffer(file))
 	if resp != nil && resp.Body != nil {
 		defer resp.Body.Close()
 		return resp.Status, err
 	}
-	return http_unknown_error, err
+	return http_unknown_error_status, err
 }
 
 // Allocs will parse the json representation from the nomad rest api
@@ -173,11 +174,13 @@ func url(nomad *NomadServer) string {
 	return fmt.Sprintf("http://%v:%v", nomad.Address, nomad.Port)
 }
 
-func decodeJSON(url string, target interface{}) error {
+func decodeJSON(url string, target interface{}) (string, error) {
 	r, err := httpClient.Get(url)
-	if err != nil {
-		return err
+	if err != nil && r != nil && r.Body != nil {
+		defer r.Body.Close()
+		return r.Status, err
+	} else if err != nil {
+		return http_unknown_error_status, err
 	}
-	defer r.Body.Close()
-	return json.NewDecoder(r.Body).Decode(target)
+	return http_ok_status, json.NewDecoder(r.Body).Decode(target)
 }
