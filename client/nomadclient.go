@@ -13,7 +13,7 @@ import (
 
 const http_bad_payload_status string = "400"
 const http_unknown_error_status string = "520"
-const http_ok_status = "200"
+const http_get_ok_status = "200"
 
 // NomadServer is connection parameters to a nomad server
 type NomadServer struct {
@@ -182,5 +182,5 @@ func decodeJSON(url string, target interface{}) (string, error) {
 	} else if err != nil {
 		return http_unknown_error_status, err
 	}
-	return http_ok_status, json.NewDecoder(r.Body).Decode(target)
+	return http_get_ok_status, json.NewDecoder(r.Body).Decode(target)
 }
