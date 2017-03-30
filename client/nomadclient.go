@@ -81,15 +81,15 @@ var httpClient = &http.Client{Timeout: 5 * time.Second}
 
 // Jobs will parse the json representation from the nomad rest api
 // /v1/jobs
-func Jobs(nomad *NomadServer) []Job {
+func Jobs(nomad *NomadServer) ([]Job, string, error) {
 	jobs := make([]Job, 0)
-	decodeJSON(url(nomad)+"/v1/jobs", &jobs)
-	return jobs
+	status, err := decodeJSON(url(nomad)+"/v1/jobs", &jobs)
+	return jobs, status, err
 }
 
 // FindJob will parse the json representation and find the supplied job name
 func FindJob(nomad *NomadServer, name string) (*Job, error) {
-	jobs := Jobs(nomad)
+	jobs, _, _ := Jobs(nomad)
 	for _, job := range jobs {
 		if job.Name == name {
 			return &job, nil
