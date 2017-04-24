@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -10,10 +11,6 @@ import (
 	"strings"
 	"time"
 )
-
-const http_bad_payload_status string = "400"
-const http_unknown_error_status string = "520"
-const http_get_ok_status = "200"
 
 // NomadServer is connection parameters to a nomad server
 type NomadServer struct {
@@ -51,19 +48,31 @@ type Task struct {
 
 // Alloc is a representation of a nomad allocation
 type Alloc struct {
-	ID           string          `json:"ID"`
-	JobID        string          `json:"JobID"`
-	NodeID       string          `json:"NodeID"`
-	Name         string          `json:"Name"`
-	ClientStatus string          `json:"ClientStatus"`
-	Tasks        map[string]Task `json:"TaskStates"`
+	ID            string          `json:"ID"`
+	JobID         string          `json:"JobID"`
+	NodeID        string          `json:"NodeID"`
+	Name          string          `json:"Name"`
+	ClientStatus  string          `json:"ClientStatus"`
+	DesiredStatus string          `json:"DesiredStatus"`
+	Tasks         map[string]Task `json:"TaskStates"`
 }
 
 // Host is a representation of a nomad client node
 type Host struct {
-	ID    string `json:"ID"`
-	Name  string `json:"Name"`
-	Drain bool   `json:"Drain"`
+	ID        string         `json:"ID"`
+	Name      string         `json:"Name"`
+	Drain     bool           `json:"Drain"`
+	Resources *NodeResources `json:"Resources,omitempty"`
+}
+
+// NodeResources represents the resources of a nomad node
+type NodeResources struct {
+	Networks *Networks `json:"Networks"`
+}
+
+// Networks represents the network available on a nomad node
+type Networks struct {
+	IP string `json:"IP"`
 }
 
 // JobNotFound indicates that a Job search failed
@@ -81,7 +90,7 @@ var httpClient = &http.Client{Timeout: 5 * time.Second}
 
 // Jobs will parse the json representation from the nomad rest api
 // /v1/jobs
-func Jobs(nomad *NomadServer) ([]Job, string, error) {
+func Jobs(nomad *NomadServer) ([]Job, int, error) {
 	jobs := make([]Job, 0)
 	status, err := decodeJSON(url(nomad)+"/v1/jobs", &jobs)
 	return jobs, status, err
@@ -104,7 +113,7 @@ func (e *JobNotFound) Error() string {
 
 // Hosts will parse the json representation from the nomad rest api
 // /v1/nodes
-func Hosts(nomad *NomadServer) ([]Host, string, error) {
+func Hosts(nomad *NomadServer) ([]Host, int, error) {
 	hosts := make([]Host, 0)
 	status, err := decodeJSON(url(nomad)+"/v1/nodes", &hosts)
 	return hosts, status, err
@@ -112,26 +121,29 @@ func Hosts(nomad *NomadServer) ([]Host, string, error) {
 
 // Drain will inform nomad to add/remove all allocations from that host
 // depending on the value of enable
-func Drain(nomad *NomadServer, id string, enable bool) (string, error) {
+// Returns the http status code or an error
+func Drain(nomad *NomadServer, id string, enable bool) (int, error) {
 	resp, err := httpClient.Post(url(nomad)+"/v1/node/"+id+"/drain?enable="+strconv.FormatBool(enable), "application/json", nil)
 	if resp != nil && resp.Body != nil {
 		defer resp.Body.Close()
-		return resp.Status, err
+		return resp.StatusCode, err
 	}
-	return http_unknown_error_status, err
+	return http.StatusInternalServerError, err
 }
 
-func SubmitJob(nomad *NomadServer, launchFilePath string) (string, error) {
+// SubmitJob requests that nomade run a json launch file located at the supplied path
+// Returns an http status code or error
+func SubmitJob(nomad *NomadServer, launchFilePath string) (int, error) {
 	file, err := ioutil.ReadFile(launchFilePath)
 	if err != nil {
-		return http_bad_payload_status, err
+		return http.StatusBadRequest, err
 	}
 	resp, err := httpClient.Post(url(nomad)+"/v1/jobs", "application/json", bytes.NewBuffer(file))
 	if resp != nil && resp.Body != nil {
 		defer resp.Body.Close()
-		return resp.Status, err
+		return resp.StatusCode, err
 	}
-	return http_unknown_error_status, err
+	return http.StatusInternalServerError, err
 }
 
 // Allocs will parse the json representation from the nomad rest api
@@ -148,6 +160,10 @@ func FindAlloc(nomad *NomadServer, job *Job, host *Host) (*Alloc, error) {
 	allocs := Allocs(nomad)
 	for _, alloc := range allocs {
 		if alloc.NodeID == host.ID && strings.Contains(alloc.Name, job.Name) {
+			// We may be looking at a stale allocation and a newer one exists
+			if alloc.DesiredStatus == "stop" && len(allocs) > 1 {
+				continue
+			}
 			return &alloc, nil
 		}
 	}
@@ -166,6 +182,22 @@ func (alloc *Alloc) CheckTaskStates(state string) bool {
 	return true
 }
 
+// HostID finds a nomad Host that matches the provided hostname
+func HostID(nomad *NomadServer, hostname *string) (*Host, error) {
+	hosts, _, err := Hosts(nomad)
+	if err != nil {
+		return &Host{}, err
+	}
+	for _, host := range hosts {
+		if *hostname == host.Name {
+			return &host, nil
+		}
+	}
+	// {"event": "node_not_found", "hostname": "server-1"}
+	return &Host{}, errors.New("{\"event\": \"node_not_found\", \"hostname\"" + *hostname + "}")
+
+}
+
 func (e *AllocNotFound) Error() string {
 	return fmt.Sprintf("Unable to find '%v' job on '%v' host.", e.Jobname, e.Hostname)
 }
@@ -174,13 +206,13 @@ func url(nomad *NomadServer) string {
 	return fmt.Sprintf("http://%v:%v", nomad.Address, nomad.Port)
 }
 
-func decodeJSON(url string, target interface{}) (string, error) {
+func decodeJSON(url string, target interface{}) (int, error) {
 	r, err := httpClient.Get(url)
 	if err != nil && r != nil && r.Body != nil {
 		defer r.Body.Close()
-		return r.Status, err
+		return r.StatusCode, err
 	} else if err != nil {
-		return http_unknown_error_status, err
+		return http.StatusInternalServerError, err
 	}
-	return http_get_ok_status, json.NewDecoder(r.Body).Decode(target)
+	return http.StatusOK, json.NewDecoder(r.Body).Decode(target)
 }
