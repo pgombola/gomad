@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
+
+	kitlog "github.com/go-kit/kit/log"
+	retryablehttp "github.com/hashicorp/go-retryablehttp"
 )
 
 // NomadServer is connection parameters to a nomad server
@@ -75,18 +77,17 @@ type Networks struct {
 	IP string `json:"IP"`
 }
 
-// JobNotFound indicates that a Job search failed
-type JobNotFound struct {
-	Name string
-}
-
 // AllocNotFound indicates a missing allocation for a Job
 type AllocNotFound struct {
 	Jobname  string
 	Hostname string
 }
 
-var httpClient = &http.Client{Timeout: 5 * time.Second}
+func log(keyvals ...interface{}) *bytes.Buffer {
+	w := new(bytes.Buffer)
+	kitlog.NewJSONLogger(w).Log(keyvals)
+	return w
+}
 
 // Jobs will parse the json representation from the nomad rest api
 // /v1/jobs
@@ -104,11 +105,7 @@ func FindJob(nomad *NomadServer, name string) (*Job, error) {
 			return &job, nil
 		}
 	}
-	return &Job{}, &JobNotFound{Name: name}
-}
-
-func (e *JobNotFound) Error() string {
-	return fmt.Sprintf("Unable to find job name: %v", e.Name)
+	return &Job{}, errors.New("job not found")
 }
 
 // Hosts will parse the json representation from the nomad rest api
@@ -123,12 +120,28 @@ func Hosts(nomad *NomadServer) ([]Host, int, error) {
 // depending on the value of enable
 // Returns the http status code or an error
 func Drain(nomad *NomadServer, id string, enable bool) (int, error) {
-	resp, err := httpClient.Post(url(nomad)+"/v1/node/"+id+"/drain?enable="+strconv.FormatBool(enable), "application/json", nil)
+	resp, err := retryablehttp.Post(url(nomad)+"/v1/node/"+id+"/drain?enable="+strconv.FormatBool(enable), "application/json", nil)
 	if resp != nil && resp.Body != nil {
 		defer resp.Body.Close()
 		return resp.StatusCode, err
 	}
 	return http.StatusInternalServerError, err
+}
+
+// StopJob will send a delete request to a nomad server to stop the provided job
+func StopJob(nomad *NomadServer, job *Job) (int, error) {
+	url := fmt.Sprintf("http://%v:%v/v1/job/%v", nomad.Address, nomad.Port, job.Name)
+	req, err := retryablehttp.NewRequest(http.MethodDelete, url, bytes.NewReader([]byte{}))
+	if err != nil {
+		buf := log("event", "stop_job_request_error", "jobname", job.Name, "error", err.Error())
+		return http.StatusInternalServerError, errors.New(buf.String())
+	}
+	resp, err := retryablehttp.NewClient().Do(req)
+	if err != nil {
+		buf := log("event", "stop_job_client_error", "jobname", job.Name, "error", err.Error())
+		return resp.StatusCode, errors.New(buf.String())
+	}
+	return resp.StatusCode, nil
 }
 
 // SubmitJob requests that nomade run a json launch file located at the supplied path
@@ -138,12 +151,9 @@ func SubmitJob(nomad *NomadServer, launchFilePath string) (int, error) {
 	if err != nil {
 		return http.StatusBadRequest, err
 	}
-	resp, err := httpClient.Post(url(nomad)+"/v1/jobs", "application/json", bytes.NewBuffer(file))
-	if resp != nil && resp.Body != nil {
-		defer resp.Body.Close()
-		return resp.StatusCode, err
-	}
-	return http.StatusInternalServerError, err
+	resp, err := retryablehttp.Post(url(nomad)+"/v1/jobs", "application/json", bytes.NewReader(file))
+	defer resp.Body.Close()
+	return resp.StatusCode, err
 }
 
 // Allocs will parse the json representation from the nomad rest api
@@ -193,8 +203,8 @@ func HostID(nomad *NomadServer, hostname *string) (*Host, error) {
 			return &host, nil
 		}
 	}
-	// {"event": "node_not_found", "hostname": "server-1"}
-	return &Host{}, errors.New("{\"event\": \"node_not_found\", \"hostname\"" + *hostname + "}")
+	buf := log("event", "node_not_found", "hostname", hostname)
+	return &Host{}, errors.New(buf.String())
 
 }
 
@@ -207,7 +217,7 @@ func url(nomad *NomadServer) string {
 }
 
 func decodeJSON(url string, target interface{}) (int, error) {
-	r, err := httpClient.Get(url)
+	r, err := retryablehttp.Get(url)
 	if err != nil && r != nil && r.Body != nil {
 		defer r.Body.Close()
 		return r.StatusCode, err
