@@ -32,7 +32,8 @@ type Summary struct {
 
 // JobSummary represents a json object in a nomad job
 type JobSummary struct {
-	Summary *Summary `json:"Summary"`
+	JobID   string             `json:"JobID"`
+	Summary map[string]Details `json:"Summary"`
 }
 
 // Job is a representation of nomad job
@@ -56,6 +57,7 @@ type Alloc struct {
 	Name          string          `json:"Name"`
 	ClientStatus  string          `json:"ClientStatus"`
 	DesiredStatus string          `json:"DesiredStatus"`
+	TaskGroup     string          `json:"TaskGroup"`
 	Tasks         map[string]Task `json:"TaskStates"`
 }
 
@@ -178,6 +180,34 @@ func FindAlloc(nomad *NomadServer, job *Job, host *Host) (*Alloc, error) {
 		}
 	}
 	return &Alloc{}, &AllocNotFound{Hostname: host.Name, Jobname: job.Name}
+}
+
+//Active determines whether a given host is active.  This is true when we find a worker
+//on a given host that isn't in a "stop" desired status
+func Active(nomad *NomadServer, job *Job, host *Host) bool {
+	allocs := Allocs(nomad)
+	for _, alloc := range allocs {
+		if alloc.NodeID == host.ID && strings.Contains(alloc.Name, job.Name) {
+			if alloc.DesiredStatus != "stop" && strings.Contains(alloc.Name, "worker") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+//Services returns a list of services present on a given host
+func Services(nomad *NomadServer, job *Job, host *Host) []string {
+	services := make([]string, 0)
+	allocs := Allocs(nomad)
+	for _, alloc := range allocs {
+		if alloc.NodeID == host.ID && strings.Contains(alloc.Name, job.Name) {
+			if alloc.DesiredStatus != "stop" {
+				services = append(services, alloc.TaskGroup)
+			}
+		}
+	}
+	return services
 }
 
 // CheckTaskStates will return whether all of the tasks for an Alloc are
